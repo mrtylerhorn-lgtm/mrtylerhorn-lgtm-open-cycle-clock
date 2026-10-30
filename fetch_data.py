@@ -30,7 +30,7 @@ FRENCH = {
 }
 INDUSTRIES = ["NoDur", "Durbl", "Manuf", "Enrgy", "Chems", "BusEq", "Telcm",
               "Utils", "Shops", "Hlth", "Money", "Other"]
-UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 open-cycle-clock",
+UA = {"User-Agent": "open-cycle-clock/1.0 (+https://github.com/mrtylerhorn-lgtm/mrtylerhorn-lgtm-open-cycle-clock)",
       "Accept": "text/csv,text/plain,application/zip,*/*"}
 LOG = []
 
@@ -54,6 +54,12 @@ def _get(url: str, tries: int = 2) -> bytes:
         except Exception as e:  # network hiccup, 429, 5xx
             last = e
             time.sleep(2 * (k + 1))
+    # Backup: curl. FRED drops some clients (anything posing as a browser) but answers curl.
+    import shutil, subprocess
+    if shutil.which("curl"):
+        r = subprocess.run(["curl", "-sSfL", "-m", "40", "-A", UA["User-Agent"], url], capture_output=True)
+        if r.returncode == 0 and r.stdout:
+            return r.stdout
     raise last
 
 
