@@ -116,7 +116,7 @@ Real-time trading rule, Aug 1971 to Sep 2026:
 3. runs `tools/check_outputs.py`, which stops the run if the latest month goes backwards, an input is more than three months stale, or the history looks truncated;
 4. commits the new `data/`, `output/` and `docs/index.html`. `docs/` is the GitHub Pages site.
 
-A small Claude scheduled task then copies the latest build from the repository to the Claude page. RenMac publishes its own clock monthly. The weekly run catches each monthly input as it lands, plus weekly jobless claims. A new monthly *reading* appears once at least half of each hand's inputs are out.
+The site is at https://mrtylerhorn-lgtm.github.io/mrtylerhorn-lgtm-open-cycle-clock/ once Pages is switched on (Settings → Pages → Deploy from a branch → `main`, `/docs`). A small Claude scheduled task (Saturday 11:13 Tokyo) then copies the latest build from the repository to the Claude page. If the Action didn't run, the task falls back to the cloud-only route below. RenMac publishes its own clock monthly. The weekly run catches each monthly input as it lands, plus weekly jobless claims. A new monthly *reading* appears once at least half of each hand's inputs are out.
 
 **Fallback.** If GitHub is unavailable, `UPDATE.md` describes a cloud-only route that reads FRED's text pages with WebFetch and merges them with `tools/merge_fred_tail.py`.
 
