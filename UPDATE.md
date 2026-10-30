@@ -9,8 +9,15 @@ tab with "Run workflow". It downloads everything directly (`fetch_data.py`), reb
 runs `tools/check_outputs.py`, and commits `data/`, `output/` and `docs/index.html`. The GitHub Pages site is
 served from `docs/`. If too many downloads fail, it commits only `output/fetch_log.txt` and marks the run failed.
 
-A Claude scheduled task runs an hour later. It clones the repository, publishes `output/cycle_clock.html` and the
-data to the Claude page, and reports what changed. It never fetches data itself.
+FRED drops any request whose user agent poses as a web browser (the connection just hangs), so `fetch_data.py`
+sends a plain `open-cycle-clock/1.0` name and falls back to `curl`. If downloads start failing again, read
+`output/fetch_log.txt` in the repository, which the workflow commits even when a run fails.
+
+A Claude scheduled task runs an hour later (Saturday 10:47 Tokyo). It clones the repository and publishes
+`output/cycle_clock.html` to the Claude page, with `output/clock.json` and `output/audit.json` as `data/clock.json`
+and `data/audit.json`, `data/**` unchanged, and the code under `src/` (`.github/workflows/weekly.yml` as
+`src/github/workflows/weekly.yml`). It reports the cell and what changed, and never fetches data itself. If the
+latest commit is not a successful "Weekly update", it reports that and leaves the page alone.
 
 ## Fallback route: cloud only, no GitHub (no computer needed)
 
