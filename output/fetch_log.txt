@@ -1,0 +1,26 @@
+Fetch run 2026-10-30 02:53 UTC
+Fetching FRED
+  FRED INDPRO    FAILED, kept previous file (csv: TimeoutError: The read operation timed out; txt: TimeoutError: The read operation timed out)
+  FRED PAYEMS    FAILED, kept previous file (csv: TimeoutError: The read operation timed out; txt: TimeoutError: The read operation timed out)
+  route csv failed 3 times with no success; skipping it for the rest of this run
+  route txt failed 3 times with no success; skipping it for the rest of this run
+  FRED UNRATE    FAILED, kept previous file (csv: TimeoutError: The read operation timed out; txt: TimeoutError: The read operation timed out)
+  FRED W875RX1   FAILED, kept previous file ()
+  FRED CMRMTSPL  FAILED, kept previous file ()
+  FRED HOUST     FAILED, kept previous file ()
+  FRED ICSA      FAILED, kept previous file ()
+  FRED GACDFSA066MSFRBPHI FAILED, kept previous file ()
+  FRED NOCDFSA066MSFRBPHI FAILED, kept previous file ()
+  FRED CPIAUCSL  FAILED, kept previous file ()
+  FRED CPILFESL  FAILED, kept previous file ()
+  FRED PPIACO    FAILED, kept previous file ()
+  FRED WTISPLC   FAILED, kept previous file ()
+  FRED AHETPI    FAILED, kept previous file ()
+  FRED GS10      FAILED, kept previous file ()
+  FRED GS2       FAILED, kept previous file ()
+  FRED FEDFUNDS  FAILED, kept previous file ()
+  FRED USREC     FAILED, kept previous file ()
+  FRED GDPC1     FAILED, kept previous file ()
+Fetching Ken French library
+  French   813 months (195901-202609)
+Done: 0/19 FRED series, French ok
