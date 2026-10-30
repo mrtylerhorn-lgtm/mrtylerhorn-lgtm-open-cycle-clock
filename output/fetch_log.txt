@@ -1,26 +1,24 @@
-Fetch run 2026-10-30 02:53 UTC
+Fetch run 2026-10-30 03:02 UTC
 Fetching FRED
-  FRED INDPRO    FAILED, kept previous file (csv: TimeoutError: The read operation timed out; txt: TimeoutError: The read operation timed out)
-  FRED PAYEMS    FAILED, kept previous file (csv: TimeoutError: The read operation timed out; txt: TimeoutError: The read operation timed out)
-  route csv failed 3 times with no success; skipping it for the rest of this run
-  route txt failed 3 times with no success; skipping it for the rest of this run
-  FRED UNRATE    FAILED, kept previous file (csv: TimeoutError: The read operation timed out; txt: TimeoutError: The read operation timed out)
-  FRED W875RX1   FAILED, kept previous file ()
-  FRED CMRMTSPL  FAILED, kept previous file ()
-  FRED HOUST     FAILED, kept previous file ()
-  FRED ICSA      FAILED, kept previous file ()
-  FRED GACDFSA066MSFRBPHI FAILED, kept previous file ()
-  FRED NOCDFSA066MSFRBPHI FAILED, kept previous file ()
-  FRED CPIAUCSL  FAILED, kept previous file ()
-  FRED CPILFESL  FAILED, kept previous file ()
-  FRED PPIACO    FAILED, kept previous file ()
-  FRED WTISPLC   FAILED, kept previous file ()
-  FRED AHETPI    FAILED, kept previous file ()
-  FRED GS10      FAILED, kept previous file ()
-  FRED GS2       FAILED, kept previous file ()
-  FRED FEDFUNDS  FAILED, kept previous file ()
-  FRED USREC     FAILED, kept previous file ()
-  FRED GDPC1     FAILED, kept previous file ()
+  FRED INDPRO      861 obs via csv
+  FRED PAYEMS      861 obs via csv
+  FRED UNRATE      861 obs via csv
+  FRED W875RX1     813 obs via csv
+  FRED CMRMTSPL    716 obs via csv
+  FRED HOUST       813 obs via csv
+  FRED ICSA       3121 obs via csv
+  FRED GACDFSA066MSFRBPHI   702 obs via csv
+  FRED NOCDFSA066MSFRBPHI   702 obs via csv
+  FRED CPIAUCSL    861 obs via csv
+  FRED CPILFESL    837 obs via csv
+  FRED PPIACO      861 obs via csv
+  FRED WTISPLC     861 obs via csv
+  FRED AHETPI      753 obs via csv
+  FRED GS10        861 obs via csv
+  FRED GS2         604 obs via csv
+  FRED FEDFUNDS    861 obs via csv
+  FRED USREC       861 obs via csv
+  FRED GDPC1       287 obs via csv
 Fetching Ken French library
   French   813 months (195901-202609)
-Done: 0/19 FRED series, French ok
+Done: 19/19 FRED series, French ok
