@@ -1,0 +1,30 @@
+plain | 200 0.087927s 14211B | https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE
+browser | curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)
+000 0.043084s 0B | https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE
+plain | 301 0.058562s 0B | https://fred.stlouisfed.org/data/UNRATE.txt
+browser | curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)
+000 0.061876s 0B | https://fred.stlouisfed.org/data/UNRATE.txt
+plain | 200 0.109741s 94158B | https://fred.stlouisfed.org/series/UNRATE
+browser | curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)
+000 0.054933s 0B | https://fred.stlouisfed.org/series/UNRATE
+plain | 400 0.137526s 191B | https://api.stlouisfed.org/fred/series?series_id=UNRATE
+browser | 400 0.122957s 191B | https://api.stlouisfed.org/fred/series?series_id=UNRATE
+plain | 200 1.075621s 14220B | https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=UNRATE
+browser | curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)
+000 0.051317s 0B | https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=UNRATE
+plain | 200 0.360411s 1112264B | https://www.stlouisfed.org/
+browser | curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)
+000 0.070481s 0B | https://www.stlouisfed.org/
+plain | 200 0.193675s 3152B | https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000
+browser | 200 0.137377s 3152B | https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000
+plain | 403 0.064255s 1323B | https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
+browser | 403 0.060613s 1323B | https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
+plain | 200 0.106254s 0B | https://www.federalreserve.gov/datadownload/Output.aspx?rel=G17&series=63e0c4ec0c1ac4c3d3e8e1fcd5d8f5a3&lastobs=5&from=&to=&filetype=csv&label=include&layout=seriescolumn
+browser | 200 0.051693s 0B | https://www.federalreserve.gov/datadownload/Output.aspx?rel=G17&series=63e0c4ec0c1ac4c3d3e8e1fcd5d8f5a3&lastobs=5&from=&to=&filetype=csv&label=include&layout=seriescolumn
+plain | 200 0.540514s 95039B | https://api.db.nomics.world/v22/series/BLS/ln/LNS14000000?observations=1
+browser | 200 0.414126s 95039B | https://api.db.nomics.world/v22/series/BLS/ln/LNS14000000?observations=1
+plain | 403 0.511088s 163B | https://api.eia.gov/
+browser | 403 0.317396s 163B | https://api.eia.gov/
+py ERR TimeoutError('The read operation timed out') 20.2 https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE
+py ERR TimeoutError('The read operation timed out') 20.0 https://fred.stlouisfed.org/data/UNRATE.txt
+20.109.38.163
