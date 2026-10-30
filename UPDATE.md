@@ -1,4 +1,18 @@
-# Weekly update runbook (runs in the cloud, no computer needed)
+# Weekly update runbook
+
+## Normal route: GitHub Actions
+
+Repository: https://github.com/mrtylerhorn-lgtm/mrtylerhorn-lgtm-open-cycle-clock
+
+`.github/workflows/weekly.yml` runs every Saturday at 00:47 UTC (09:47 Tokyo). Run it by hand from the Actions
+tab with "Run workflow". It downloads everything directly (`fetch_data.py`), rebuilds the clock, audit and page,
+runs `tools/check_outputs.py`, and commits `data/`, `output/` and `docs/index.html`. The GitHub Pages site is
+served from `docs/`. If too many downloads fail, it commits only `output/fetch_log.txt` and marks the run failed.
+
+A Claude scheduled task runs an hour later. It clones the repository, publishes `output/cycle_clock.html` and the
+data to the Claude page, and reports what changed. It never fetches data itself.
+
+## Fallback route: cloud only, no GitHub (no computer needed)
 
 The clock is refreshed weekly. Monthly inputs land at different times (jobs: first Friday; CPI and industrial
 production: mid-month; Philly Fed: third Thursday; income and spending: month-end), and jobless claims are weekly.

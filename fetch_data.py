@@ -40,17 +40,20 @@ def log(msg):
     LOG.append(msg)
 
 
-def _get(url: str, tries: int = 4) -> bytes:
+DEAD, FAILS, OKS = set(), {}, set()   # routes that have failed repeatedly this run are skipped for later series
+
+
+def _get(url: str, tries: int = 2) -> bytes:
     import time
     last = None
     for k in range(tries):
         try:
             req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=25) as r:
                 return r.read()
         except Exception as e:  # network hiccup, 429, 5xx
             last = e
-            time.sleep(3 * (k + 1))
+            time.sleep(2 * (k + 1))
     raise last
 
 
@@ -98,6 +101,8 @@ def fetch_fred(outdir: str) -> int:
                    ("txt", f"https://fred.stlouisfed.org/data/{sid}.txt")]
         ok, errs = False, []
         for name, url in routes:
+            if name in DEAD:
+                continue
             try:
                 raw = _get(url).decode("utf-8", "replace")
                 if name == "api":
@@ -114,9 +119,14 @@ def fetch_fred(outdir: str) -> int:
                     f.write(txt.strip() + "\n")
                 log(f"  FRED {sid:9s} {len(txt.splitlines()) - 1:5d} obs via {name}")
                 ok = True
+                OKS.add(name)
                 break
             except Exception as e:
                 errs.append(f"{name}: {type(e).__name__}: {str(e)[:120]}")
+                FAILS[name] = FAILS.get(name, 0) + 1
+                if FAILS[name] >= 3 and name not in OKS:
+                    DEAD.add(name)
+                    log(f"  route {name} failed 3 times with no success; skipping it for the rest of this run")
         if not ok:
             failed += 1
             log(f"  FRED {sid:9s} FAILED, kept previous file ({'; '.join(errs)})")
