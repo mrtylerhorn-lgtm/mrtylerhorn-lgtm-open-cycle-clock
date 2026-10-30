@@ -1,0 +1,46 @@
+name: probe
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe
+        run: |
+          set +e
+          out=probe.txt; : > $out
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          for u in \
+            "https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE" \
+            "https://fred.stlouisfed.org/data/UNRATE.txt" \
+            "https://fred.stlouisfed.org/series/UNRATE" \
+            "https://api.stlouisfed.org/fred/series?series_id=UNRATE" \
+            "https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=UNRATE" \
+            "https://www.stlouisfed.org/" \
+            "https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000" \
+            "https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems" \
+            "https://www.federalreserve.gov/datadownload/Output.aspx?rel=G17&series=63e0c4ec0c1ac4c3d3e8e1fcd5d8f5a3&lastobs=5&from=&to=&filetype=csv&label=include&layout=seriescolumn" \
+            "https://api.db.nomics.world/v22/series/BLS/ln/LNS14000000?observations=1" \
+            "https://api.eia.gov/" ; do
+            for ua in plain browser; do
+              if [ $ua = plain ]; then a="curl/8"; else a="$UA"; fi
+              r=$(curl -sS -o /tmp/b -w "%{http_code} %{time_total}s %{size_download}B" -m 20 -A "$a" "$u" 2>&1)
+              echo "$ua | $r | $u" >> $out
+            done
+          done
+          python3 - >> $out <<'PY'
+          import urllib.request, time
+          for u in ["https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE","https://fred.stlouisfed.org/data/UNRATE.txt"]:
+              t=time.time()
+              try:
+                  r=urllib.request.urlopen(urllib.request.Request(u,headers={"User-Agent":"Mozilla/5.0"}),timeout=20); b=r.read()
+                  print("py", r.status, len(b), round(time.time()-t,1), u)
+              except Exception as e: print("py ERR", repr(e)[:120], round(time.time()-t,1), u)
+          PY
+          curl -sS -m 10 https://ifconfig.me >> $out 2>&1; echo >> $out
+          git config user.name probe; git config user.email probe@users.noreply.github.com
+          git checkout -b probe-results
+          git add -f probe.txt && git commit -qm probe && git push -f origin probe-results
