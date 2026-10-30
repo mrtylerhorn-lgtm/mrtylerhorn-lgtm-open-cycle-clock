@@ -1,0 +1,64 @@
+name: Weekly update
+
+on:
+  schedule:
+    - cron: "47 0 * * 6"      # Saturdays 00:47 UTC = 09:47 Tokyo, after the week's US releases
+  workflow_dispatch:           # "Run workflow" button for a manual refresh
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Keep last week's output for the change log
+        run: |
+          mkdir -p output
+          if [ -f output/clock.json ]; then cp output/clock.json prev_clock.json; fi
+
+      - name: Fetch data (FRED + Ken French)
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          python fetch_data.py data
+          if [ -n "$FRED_API_KEY" ]; then python fetch_data.py data --vintage; fi
+
+      - name: Run the clock and the audit
+        run: |
+          python clock.py data output/clock.json
+          python audit.py data output/audit.json
+
+      - name: Build the page
+        run: |
+          python build_page.py --prev prev_clock.json
+          python build_page.py --prev prev_clock.json --standalone --out docs/index.html
+          touch docs/.nojekyll
+
+      - name: Sanity checks
+        run: python tools/check_outputs.py prev_clock.json output/clock.json
+
+      - name: Commit
+        run: |
+          git config user.name "cycle-clock-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data output docs
+          if git diff --cached --quiet; then echo "No changes."; exit 0; fi
+          month=$(python -c "import json;print(json.load(open('output/clock.json'))['latest_month'])")
+          git commit -m "Weekly update: data through ${month}"
+          git push
