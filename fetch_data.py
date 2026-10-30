@@ -30,13 +30,44 @@ FRENCH = {
 }
 INDUSTRIES = ["NoDur", "Durbl", "Manuf", "Enrgy", "Chems", "BusEq", "Telcm",
               "Utils", "Shops", "Hlth", "Money", "Other"]
-UA = {"User-Agent": "open-market-cycle-clock/1.0"}
+UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 open-cycle-clock",
+      "Accept": "text/csv,text/plain,application/zip,*/*"}
+LOG = []
 
 
-def _get(url: str) -> bytes:
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return r.read()
+def log(msg):
+    print(msg, flush=True)
+    LOG.append(msg)
+
+
+def _get(url: str, tries: int = 4) -> bytes:
+    import time
+    last = None
+    for k in range(tries):
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.read()
+        except Exception as e:  # network hiccup, 429, 5xx
+            last = e
+            time.sleep(3 * (k + 1))
+    raise last
+
+
+def _valid_csv(txt: str, sid: str) -> bool:
+    lines = txt.strip().splitlines()
+    return len(lines) > 20 and lines[0].lower().startswith(("observation_date", "date")) and lines[-1][:4].isdigit()
+
+
+def _fred_txt_to_csv(txt: str, sid: str) -> str:
+    """https://fred.stlouisfed.org/data/<ID>.txt → the same CSV layout as fredgraph.csv."""
+    import re
+    rows = [f"observation_date,{sid}"]
+    for line in txt.splitlines():
+        m = re.match(r"^(\d{4}-\d{2}-\d{2})\s+(\S+)\s*$", line.strip())
+        if m and m.group(1) >= "1955-01-01":
+            rows.append(f"{m.group(1)},{'' if m.group(2) == '.' else m.group(2)}")
+    return "\n".join(rows)
 
 
 def _first_monthly_block(text: str) -> list[list[str]]:
@@ -52,17 +83,56 @@ def _first_monthly_block(text: str) -> list[list[str]]:
     return rows
 
 
-def fetch_fred(outdir: str) -> None:
+def fetch_fred(outdir: str) -> int:
+    """Download each series, trying three routes. A series that fails keeps its previous file."""
+    import json as _json
     os.makedirs(os.path.join(outdir, "fred"), exist_ok=True)
+    key = os.environ.get("FRED_API_KEY")
+    failed = 0
     for sid in FRED_IDS:
-        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd=1955-01-01"
-        txt = _get(url).decode()
-        with open(os.path.join(outdir, "fred", f"{sid}.csv"), "w") as f:
-            f.write(txt.strip() + "\n")
-        print(f"  FRED {sid:9s} {len(txt.splitlines()) - 1:5d} obs")
+        routes = []
+        if key:
+            routes.append(("api", f"https://api.stlouisfed.org/fred/series/observations?series_id={sid}"
+                                  f"&api_key={key}&file_type=json&observation_start=1955-01-01"))
+        routes += [("csv", f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd=1955-01-01"),
+                   ("txt", f"https://fred.stlouisfed.org/data/{sid}.txt")]
+        ok, errs = False, []
+        for name, url in routes:
+            try:
+                raw = _get(url).decode("utf-8", "replace")
+                if name == "api":
+                    obs = _json.loads(raw)["observations"]
+                    txt = f"observation_date,{sid}\n" + "\n".join(
+                        f"{o['date']},{'' if o['value'] == '.' else o['value']}" for o in obs)
+                elif name == "txt":
+                    txt = _fred_txt_to_csv(raw, sid)
+                else:
+                    txt = raw
+                if not _valid_csv(txt, sid):
+                    raise ValueError(f"unexpected content: {raw[:80]!r}")
+                with open(os.path.join(outdir, "fred", f"{sid}.csv"), "w") as f:
+                    f.write(txt.strip() + "\n")
+                log(f"  FRED {sid:9s} {len(txt.splitlines()) - 1:5d} obs via {name}")
+                ok = True
+                break
+            except Exception as e:
+                errs.append(f"{name}: {type(e).__name__}: {str(e)[:120]}")
+        if not ok:
+            failed += 1
+            log(f"  FRED {sid:9s} FAILED, kept previous file ({'; '.join(errs)})")
+    return failed
 
 
-def fetch_french(outdir: str) -> None:
+def fetch_french(outdir: str) -> int:
+    try:
+        _fetch_french(outdir)
+        return 0
+    except Exception as e:
+        log(f"  French FAILED, kept previous file ({type(e).__name__}: {str(e)[:160]})")
+        return 1
+
+
+def _fetch_french(outdir: str) -> None:
     def unzip(url):
         z = zipfile.ZipFile(io.BytesIO(_get(url)))
         return z.read(z.namelist()[0]).decode("latin-1")
@@ -78,7 +148,7 @@ def fetch_french(outdir: str) -> None:
         lines.append(",".join([r[0], f"{mkt:.2f}", f[4]] + r[1:13]))
     with open(os.path.join(outdir, "french_monthly.csv"), "w") as fh:
         fh.write("\n".join(lines) + "\n")
-    print(f"  French   {len(lines) - 1} months ({lines[1][:6]}–{lines[-1][:6]})")
+    log(f"  French   {len(lines) - 1} months ({lines[1][:6]}-{lines[-1][:6]})")
 
 
 VINTAGE_IDS = ["PAYEMS", "INDPRO", "HOUST", "UNRATE", "W875RX1", "CMRMTSPL", "AHETPI",
@@ -110,7 +180,13 @@ if __name__ == "__main__":
             sys.exit("Set FRED_API_KEY to download first-release data.")
         fetch_vintage(sys.argv[1] if len(sys.argv) > 2 and not sys.argv[1].startswith("-") else "data", key)
         sys.exit()
-    out = sys.argv[1] if len(sys.argv) > 1 else "data"
-    print("Fetching FRED…"); fetch_fred(out)
-    print("Fetching Ken French library…"); fetch_french(out)
-    print("Done.")
+    out = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "data"
+    from datetime import datetime, timezone
+    log(f"Fetch run {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
+    log("Fetching FRED"); nf = fetch_fred(out)
+    log("Fetching Ken French library"); nk = fetch_french(out)
+    log(f"Done: {len(FRED_IDS) - nf}/{len(FRED_IDS)} FRED series, French {'ok' if not nk else 'failed'}")
+    os.makedirs("output", exist_ok=True)
+    with open(os.path.join("output", "fetch_log.txt"), "w") as fh:
+        fh.write("\n".join(LOG) + "\n")
+    sys.exit(2 if nf > 5 else 0)   # many failures: stop the run; a few: carry on with previous files

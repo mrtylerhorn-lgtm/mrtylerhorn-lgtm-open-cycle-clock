@@ -33,32 +33,47 @@ jobs:
           if [ -f output/clock.json ]; then cp output/clock.json prev_clock.json; fi
 
       - name: Fetch data (FRED + Ken French)
+        id: fetch
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
+          set +e
           python fetch_data.py data
+          echo "code=$?" >> "$GITHUB_OUTPUT"
           if [ -n "$FRED_API_KEY" ]; then python fetch_data.py data --vintage; fi
+          exit 0
 
       - name: Run the clock and the audit
+        if: steps.fetch.outputs.code == '0'
         run: |
           python clock.py data output/clock.json
           python audit.py data output/audit.json
 
       - name: Build the page
+        if: steps.fetch.outputs.code == '0'
         run: |
           python build_page.py --prev prev_clock.json
           python build_page.py --prev prev_clock.json --standalone --out docs/index.html
           touch docs/.nojekyll
 
       - name: Sanity checks
+        id: checks
+        if: steps.fetch.outputs.code == '0'
         run: python tools/check_outputs.py prev_clock.json output/clock.json
 
       - name: Commit
+        if: always()
         run: |
           git config user.name "cycle-clock-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data output docs
-          if git diff --cached --quiet; then echo "No changes."; exit 0; fi
-          month=$(python -c "import json;print(json.load(open('output/clock.json'))['latest_month'])")
-          git commit -m "Weekly update: data through ${month}"
-          git push
+          if [ "${{ steps.fetch.outputs.code }}" = "0" ] && [ "${{ steps.checks.outcome }}" = "success" ]; then
+            git add data output docs
+            month=$(python -c "import json;print(json.load(open('output/clock.json'))['latest_month'])")
+            msg="Weekly update: data through ${month}"
+          else
+            git checkout -- data output docs 2>/dev/null || true
+            git add -f output/fetch_log.txt 2>/dev/null || true
+            msg="Weekly update skipped: see output/fetch_log.txt"
+          fi
+          if git diff --cached --quiet; then echo "No changes."; else git commit -m "$msg" && git push; fi
+          if [ "${{ steps.fetch.outputs.code }}" != "0" ] || [ "${{ steps.checks.outcome }}" = "failure" ]; then exit 1; fi
