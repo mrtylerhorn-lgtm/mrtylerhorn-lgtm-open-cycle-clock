@@ -1,4 +1,4 @@
-Fetch run 2026-10-31 01:42 UTC
+Fetch run 2026-11-01 00:18 UTC
 Fetching FRED
   FRED INDPRO      861 obs via csv
   FRED PAYEMS      861 obs via csv
@@ -14,6 +14,8 @@ Fetching FRED
   FRED PPIACO      861 obs via csv
   FRED WTISPLC     861 obs via csv
   FRED AHETPI      753 obs via csv
+  FRED CFNAI       715 obs via csv
+  FRED GACDINA066MSFRBNY FAILED, kept previous file (csv: HTTPError: HTTP Error 404: Not Found; txt: HTTPError: HTTP Error 404: Not Found)
   FRED GS10        861 obs via csv
   FRED GS2         604 obs via csv
   FRED FEDFUNDS    861 obs via csv
@@ -21,4 +23,4 @@ Fetching FRED
   FRED GDPC1       287 obs via csv
 Fetching Ken French library
   French   813 months (195901-202609)
-Done: 19/19 FRED series, French ok
+Done: 20/21 FRED series, French ok
