@@ -21,6 +21,8 @@ FRED_IDS = [
     "GACDFSA066MSFRBPHI", "NOCDFSA066MSFRBPHI",   # Philly Fed manufacturing survey
     # inflation
     "CPIAUCSL", "CPILFESL", "PPIACO", "WTISPLC", "AHETPI",
+    # benchmarks (not model inputs): Chicago Fed National Activity Index, Empire State factory survey
+    "CFNAI", "GACDINA066MSFRBNY",
     # rates / context
     "GS10", "GS2", "FEDFUNDS", "USREC", "GDPC1",
 ]
