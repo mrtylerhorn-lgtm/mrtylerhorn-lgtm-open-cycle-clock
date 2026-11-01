@@ -108,6 +108,21 @@ Real-time trading rule, Aug 1971 to Sep 2026:
 
 **Changes made from the audit:** crash odds (10%+ fall within a year) per cell and row, now on the dial, in the cell readout and in the headline; a report-card section on the page; the 2-year Treasury yield (which deGraaf watches more than the Fed funds rate); cyclicals re-chosen by relative return vs forward real GDP; first-release data support; a weekly update with a "since the last update" log.
 
+## Data, sources and the professional standard (v5 audit)
+
+A Wall Street buyer's checks, run in `clock.py` (`backtest.vs`) and `audit.py` (`benchmarks`, `data`), and shown on the page:
+
+| Check | Result |
+|---|---|
+| Data integrity | No duplicate dates or stray gaps; every large jump is a real event (1974 oil, 2013 income shift, 2020). Oct 2025 CPI, core CPI and unemployment were never collected (shutdown); single-month holes are now filled by log-linear interpolation and flagged on the page. |
+| vs a 10-month moving-average trend rule, after 0.10% per switch | Inflation rule 12.1% a year, Sharpe 0.64, worst fall −38%; trend rule 10.2%, 0.52, −24%; buy-and-hold 11.3%, 0.49, −50%. Cash if either warns: 9.9%, worst fall −18%. |
+| Does inflation add to trend? | With the trend *up*, a 10%+ fall within a year followed 49% of heating months vs 27% of others (placebo p ≈ 0.001). Only 37% of the rule's cash months overlap the trend rule's. |
+| Growth hand vs Chicago Fed National Activity Index | Correlation 0.92 with its 12-month average, 0.56 with its 3-month average: right signal, slower at turns. |
+| Recessions | 94% of NBER recession months fall in the weak-growth third; none in the strong third. |
+| Survey breadth | The Empire State survey is fetched to check whether the Philadelphia survey is representative. |
+
+**Commercial readiness.** FRED's terms allow personal, non-commercial use, and its WTI series (`WTISPLC`) is copyrighted; Ken French returns are CRSP-derived. A commercial version would (1) test on first-release data (add a free `FRED_API_KEY` repository secret; the workflow and `audit.py` then run it), (2) fetch each series from its original agency, use EIA's public WTI price (1986 on) plus licensed earlier history, and license CRSP or S&P returns, (3) average several regional Fed surveys, (4) build a live track record (the weekly commits are timestamped from Oct 2026), and (5) be positioned as a crash-risk gauge, not a return forecaster.
+
 ## Weekly updates
 
 **GitHub Actions does the work.** `.github/workflows/weekly.yml` runs every Saturday at 09:47 Tokyo time (00:47 UTC), after the week's US releases, and can also be run by hand from the Actions tab. It:

@@ -107,7 +107,27 @@ def load_fred(data_dir: str, sid: str) -> pd.Series:
     if sid == "ICSA":  # weekly -> monthly average
         s = s.resample("MS").mean()
     s.index = s.index.to_period("M")
+    # Fill isolated one-month holes (e.g. Oct 2025, when the shutdown stopped CPI and jobs-survey
+    # collection) by interpolating between neighbours, log-linear for positive series. Without this,
+    # every 12-month change that touches the hole goes missing. Quarterly series are left alone.
+    full = pd.period_range(s.index.min(), s.index.max(), freq="M")
+    gaps = full.difference(s.index)
+    if 0 < len(gaps) <= 0.02 * len(full):
+        r = s.reindex(full)
+        isolated = [p for p in gaps if (p - 1) in s.index and (p + 1) in s.index]
+        if isolated:
+            pos = bool((s > 0).all())
+            base = np.log(r) if pos else r
+            filled = base.interpolate(limit=1, limit_area="inside")
+            filled = np.exp(filled) if pos else filled
+            for p in isolated:
+                r[p] = filled[p]
+            FILLED[sid] = [str(p) for p in isolated]
+            s = r.dropna()
     return s
+
+
+FILLED: dict = {}   # series id -> months filled by interpolation (shown on the page)
 
 
 def load_market(data_dir: str) -> pd.DataFrame:
@@ -421,7 +441,65 @@ def backtest(zr_rt, mkt, cfg, seed=0):
         "curve": [{"m": str(k), "bh": round(float(a), 4), "rule": round(float(b), 4)}
                   for k, a, b in zip(idx, (1 + bh).cumprod(), (1 + rule).cumprod())],
         "in_cash_next": bool(sig.iloc[-1] == 2), "signal_month": str(sig.index[-1]),
+        "_pos": p,
     }
+
+
+COST_PER_SWITCH = 0.001   # 0.10% of the portfolio each time the rule moves in or out (spread, commission, slippage)
+
+
+def benchmarks(bt_pos, mkt, seed=1):
+    """What a professional would compare the trading rule with.
+    bt_pos: the inflation rule's position (1 stocks / 0 T-bills) indexed by the month it is held.
+      * trading costs on every switch;
+      * the standard free alternative, a 10-month moving-average trend rule (Faber 2007): hold stocks
+        next month if the market's total-return index ended this month above its 10-month average;
+      * both rules together;
+      * does 'inflation heating' still flag crash risk when the trend is already up (information the
+        trend rule doesn't have)?"""
+    tri = (1 + mkt["mkt"]).cumprod()
+    trend = (tri > tri.rolling(10).mean()).astype(float).shift(1)   # known at the end of the prior month
+    idx = bt_pos.index.intersection(trend.dropna().index)
+    pi, pt = bt_pos[idx], trend[idx]
+    bh, cash = mkt["mkt"][idx], mkt["rf"][idx]
+
+    def run(pos):
+        gross = pos * bh + (1 - pos) * cash
+        sw = pos.diff().abs().fillna(0)
+        net = gross - COST_PER_SWITCH * sw
+        w = (1 + net).cumprod()
+        ex = net - cash
+        return {"cagr": float(w.iloc[-1] ** (12 / len(net)) - 1),
+                "gross_cagr": float((1 + gross).prod() ** (12 / len(gross)) - 1),
+                "maxdd": float((w / w.cummax() - 1).min()),
+                "sharpe": float(ex.mean() / ex.std() * math.sqrt(12)),
+                "vol": float(net.std() * math.sqrt(12)),
+                "time_in_stocks": float(pos.mean()), "switches_per_year": float(sw.sum() * 12 / len(pos))}
+
+    rules = {"buy_hold": run(pd.Series(1.0, index=idx)), "inflation": run(pi), "trend": run(pt),
+             "either": run(pi * pt),                      # stocks only when both rules say so
+             "both": run(1 - (1 - pi) * (1 - pt))}        # cash only when both rules say so
+    # Incremental information: crash odds by trend state, heating vs not.
+    dd = max_dd_forward(mkt["mkt"], 0, 12).reindex(idx)
+    fall = (dd <= -0.10).astype(float).where(dd.notna())
+    heat = 1 - pi
+
+    def gap(h, mask):
+        a, b = fall[mask & (h == 1)].mean(), fall[mask & (h == 0)].mean()
+        return float(a - b), float(a), float(b), int((mask & (h == 1)).sum()), int((mask & (h == 0)).sum())
+
+    out = {}
+    rng = np.random.default_rng(seed)
+    for name, mask in (("trend_up", pt == 1), ("trend_down", pt == 0)):
+        g0, a, b, na, nb = gap(heat, mask)
+        hv = heat.values
+        plc = [gap(pd.Series(np.roll(hv, rng.integers(24, len(hv) - 24)), index=idx), mask)[0] for _ in range(2000)]
+        out[name] = {"heating": a, "not": b, "gap": g0, "n_heating": na, "n_not": nb,
+                     "p": float((np.array(plc) >= g0).mean())}
+    overlap = float(((pi == 0) & (pt == 0)).sum() / max((pi == 0).sum(), 1))
+    return {"start": str(idx[0]), "end": str(idx[-1]), "cost_per_switch": COST_PER_SWITCH,
+            "rules": rules, "crash_by_trend": out, "cash_overlap": overlap,
+            "trend_in_stocks_now": bool(trend.iloc[-1] == 1) if len(trend) else None}
 
 
 def sensitivity(data_dir, cfg, last):
@@ -551,6 +629,7 @@ def run(data_dir="data", out_json="output/clock.json"):
 
     first_rt = pd.Series(zkey_rt.index < pd.Period(cfg["split"], "M"), index=zkey_rt.index)
     bt = backtest(zr_rt, mkt, cfg)
+    bt["vs"] = benchmarks(bt.pop("_pos"), mkt)
     usrec = load_fred(data_dir, "USREC")
 
     series = [{"m": str(p), "g": round(float(g[p]), 3), "i": round(float(i[p]), 3),
@@ -603,6 +682,7 @@ def run(data_dir="data", out_json="output/clock.json"):
         "industries": INDUSTRY_LABELS, "cyclicals": cfg["cyclicals"], "defensives": cfg["defensives"],
         "series": series,
         "config": {k: v for k, v in cfg.items() if k not in ("growth", "inflation")},
+        "filled": FILLED,
     }
     os.makedirs(os.path.dirname(out_json) or ".", exist_ok=True)
     with open(out_json, "w") as f:

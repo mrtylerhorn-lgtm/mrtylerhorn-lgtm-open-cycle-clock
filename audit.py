@@ -33,6 +33,21 @@ RNG = np.random.default_rng(7)
 N_PLACEBO = 2000
 
 
+# where each series really comes from, and what that means for commercial use
+SOURCES = {
+    "INDPRO": ("Federal Reserve Board", "public"), "PAYEMS": ("Bureau of Labor Statistics", "public"),
+    "UNRATE": ("Bureau of Labor Statistics", "public"), "W875RX1": ("Bureau of Economic Analysis", "public"),
+    "CMRMTSPL": ("Bureau of Economic Analysis / Census", "public"), "HOUST": ("Census Bureau", "public"),
+    "ICSA": ("Department of Labor", "public"), "GACDFSA066MSFRBPHI": ("Philadelphia Fed survey", "reserve_bank"),
+    "NOCDFSA066MSFRBPHI": ("Philadelphia Fed survey", "reserve_bank"), "CPIAUCSL": ("Bureau of Labor Statistics", "public"),
+    "CPILFESL": ("Bureau of Labor Statistics", "public"), "PPIACO": ("Bureau of Labor Statistics", "public"),
+    "WTISPLC": ("St. Louis Fed splice of published oil prices", "copyrighted"), "AHETPI": ("Bureau of Labor Statistics", "public"),
+    "GS10": ("Federal Reserve Board", "public"), "GS2": ("Federal Reserve Board", "public"),
+    "FEDFUNDS": ("Federal Reserve Board", "public"), "USREC": ("NBER via St. Louis Fed", "reserve_bank"),
+    "GDPC1": ("Bureau of Economic Analysis", "public"), "CFNAI": ("Chicago Fed", "reserve_bank"),
+    "GACDISA066MSFRBNY": ("New York Fed survey", "reserve_bank"),
+}
+
 def scored_hands(data_dir, cfg):
     g, gparts, _ = C.build_hand(data_dir, cfg["growth"], cfg)
     i, iparts, _ = C.build_hand(data_dir, cfg["inflation"], cfg)
@@ -328,6 +343,48 @@ def run(data_dir="data", out_json="output/audit.json"):
     # 9. point-in-time data
     out["vintage"] = vintage_test(data_dir, cfg)
 
+    # 9. growth hand vs free professional benchmarks
+    bench = {}
+    try:
+        raw = C.load_fred(data_dir, "CFNAI")
+        cf = raw.rolling(12).mean().reindex(g.index)       # 12-month average: like-for-like with a year-over-year hand
+        cf3 = raw.rolling(3).mean().reindex(g.index)       # CFNAI-MA3, the Chicago Fed's headline: faster
+        ok = cf.notna() & g.notna()
+        _, zcf, _ = C.rank_thirds(cf[ok])
+        bench["cfnai"] = {"corr": float(g[ok].corr(cf[ok])), "corr_ma3": float(g[ok].corr(cf3[ok])),
+                          "same_third": float((zc[ok] == zcf).mean()), "since": str(cf[ok].index[0]),
+                          "latest_ma3": float(cf3.dropna().iloc[-1]), "latest_month": str(cf3.dropna().index[-1])}
+    except FileNotFoundError:
+        bench["cfnai"] = None
+    rec = C.load_fred(data_dir, "USREC").reindex(g.index).fillna(0)
+    bench["recessions"] = {"rec_months_in_weak": float((zc[rec == 1] == 0).mean()),
+                           "weak_months_in_rec": float((rec[zc == 0] == 1).mean()),
+                           "rec_months_in_strong": float((zc[rec == 1] == 2).mean())}
+    try:   # is the Philly Fed survey representative? compare with the New York Fed's Empire State survey
+        ph = C.load_fred(data_dir, "GACDFSA066MSFRBPHI").rolling(3).mean()
+        ny = C.load_fred(data_dir, "GACDISA066MSFRBNY").rolling(3).mean()
+        both = pd.concat([ph, ny], axis=1).dropna()
+        bench["philly_vs_empire"] = {"corr": float(both.iloc[:, 0].corr(both.iloc[:, 1])), "since": str(both.index[0]),
+                                     "latest_philly": float(both.iloc[-1, 0]), "latest_empire": float(both.iloc[-1, 1]),
+                                     "latest": str(both.index[-1])}
+    except FileNotFoundError:
+        bench["philly_vs_empire"] = None
+    out["benchmarks"] = bench
+
+    # 10. data integrity and sources
+    rows = []
+    for sid, (agency, kind) in SOURCES.items():
+        path = os.path.join(data_dir, "fred", f"{sid}.csv")
+        if not os.path.exists(path):
+            continue
+        raw = pd.read_csv(path)
+        x = C.load_fred(data_dir, sid)
+        rows.append({"id": sid, "agency": agency, "kind": kind, "first": str(x.index.min()), "last": str(x.index.max()),
+                     "obs": int(len(x)), "duplicates": int(pd.to_datetime(raw.iloc[:, 0]).duplicated().sum()),
+                     "filled": C.FILLED.get(sid, [])})
+    out["data"] = {"series": rows, "returns": {"source": "Kenneth R. French Data Library (CRSP value-weighted US market, 12 industries, 1-month T-bill)",
+                                              "last": str(mkt.index.max()), "months": int(len(mkt))}}
+
     os.makedirs(os.path.dirname(out_json) or ".", exist_ok=True)
     json.dump(out, open(out_json, "w"), separators=(",", ":"))
     return out
@@ -354,3 +411,4 @@ if __name__ == "__main__":
     r = res["risk"]
     print("Risk heating gap", round(r["heating_gap"], 3), "placebo p", r["heating_p"], "rt rows", [round(x, 2) for x in r["rt_rows"]], "h1", [round(x, 2) for x in r["h1"]], "h2", [round(x, 2) for x in r["h2"]])
     print("Vintage:", res["vintage"])
+    print("Benchmarks:", res["benchmarks"])

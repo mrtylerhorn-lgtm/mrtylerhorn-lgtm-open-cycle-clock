@@ -101,8 +101,8 @@ button:focus-visible,input:focus-visible,summary:focus-visible,#dial .cell:focus
 
 /* evidence */
 .cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
-@media (max-width:760px){.cols2{grid-template-columns:1fr}}
-.tablewrap{overflow-x:auto}
+@media (max-width:760px){.cols2{grid-template-columns:minmax(0,1fr)}}
+.tablewrap{overflow-x:auto;position:relative}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
@@ -296,6 +296,10 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
       </div>
     </div>
     <p class="verdict" id="btVerdict"></p>
+    <h3 style="margin-top:6px">Against the standard free alternative</h3>
+    <p class="small muted measure" id="vsIntro"></p>
+    <div class="tablewrap"><table id="vsTable"><thead><tr><th></th><th class="num">Always in stocks</th><th class="num">Inflation rule</th><th class="num">Trend rule</th><th class="num">Cash if either warns</th><th class="num">Cash only if both warn</th></tr></thead><tbody></tbody></table></div>
+    <p class="verdict" id="vsVerdict"></p>
     <details>
       <summary>Where the difference came from</summary>
       <p class="small muted measure" style="margin-bottom:8px">Gain or loss from the rule versus always holding stocks, by five-year period, in percentage points of growth. Then the longest stretches the rule spent in cash, and what stocks did meanwhile.</p>
@@ -335,6 +339,32 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
       </section>
     </div>
   </div>
+
+  <section class="panel stack" aria-labelledby="dataH">
+    <h2 id="dataH">Data, sources and the professional standard</h2>
+    <p class="muted measure">Where every number comes from, how it was checked, how this clock compares with what professionals pay for, and what it would still need before a fund could rely on it.</p>
+    <div class="cols2">
+      <div class="stack" style="gap:8px">
+        <h3>The inputs</h3>
+        <div class="tablewrap"><table id="srcTable"><thead><tr><th>Series</th><th>Original source</th><th class="num">History</th><th>Use rights</th></tr></thead><tbody></tbody></table></div>
+        <p class="small muted" id="srcNote"></p>
+      </div>
+      <div class="stack" style="gap:8px">
+        <h3>Cross-checks</h3>
+        <ul class="small" id="xchecks" style="margin:0;padding-left:18px"></ul>
+      </div>
+    </div>
+    <h3>How it compares</h3>
+    <div class="tablewrap"><table id="cmpTable"><thead><tr><th>Alternative</th><th>What it gives you</th><th>How this clock compares</th></tr></thead><tbody>
+      <tr><td><b>RenMac Market Cycle Clock</b></td><td>The original. Proprietary inputs, an analyst team's judgment, history from 1964, sent to paying clients monthly.</td><td>Same design and the same published row in every public check (cell in about half). This one shows every input and every test, and refreshes weekly. It lacks the analyst commentary and RenMac's own inputs.</td></tr>
+      <tr><td><b>Paid growth-and-inflation "quad" services</b></td><td>Forecasts of where growth and inflation are heading over the next quarters, sorted into four regimes, with trade ideas.</td><td>This clock measures where the economy is now from data as reported; it does not forecast. Simpler and fully checkable, but slower at turning points.</td></tr>
+      <tr><td><b>Business-cycle sector guides</b></td><td>Early, mid, late cycle and recession phases with sector tilts, partly set by judgment.</td><td>Here the phase is set by rules, and the industry results come with standard errors, so you can see which tilts are real and which are noise.</td></tr>
+      <tr><td><b>Free activity indexes</b> (Chicago Fed national activity index, OECD leading indicators)</td><td>One growth number, no inflation axis, no market statistics.</td><td>The growth hand tracks the Chicago Fed index closely over a year (see cross-checks). The inflation axis and the market tests are what this clock adds.</td></tr>
+      <tr><td><b>A 10-month moving-average trend rule</b></td><td>The standard free market-timing rule: own stocks while they are above their 10-month average.</td><td id="cmpTrend">See "Against the standard free alternative" above.</td></tr>
+    </tbody></table></div>
+    <h3>What it would still need before a fund could rely on it</h3>
+    <ol class="small measure" id="needs" style="margin:0;padding-left:20px"></ol>
+  </section>
 
   <section class="panel prose" aria-labelledby="howH">
     <h2 id="howH">How it works</h2>
@@ -781,7 +811,41 @@ function render(){
   document.getElementById("monthLbl").textContent=S[idx].m;
   drawDial();drawZone();drawHist();
 }
-function full(){drawStamp();drawReport();drawNow();drawFacts();drawMetricSeg();drawHorSeg();drawEvidence();drawBacktest();drawTables();render();}
+function drawVs(){
+  const V=D.backtest.vs;if(!V)return;const R=V.rules,cols=[R.buy_hold,R.inflation,R.trend,R.either,R.both];
+  document.getElementById("vsIntro").textContent=`Professionals would first ask whether this beats the simplest free timing rule: hold stocks while the market is above its 10-month average, otherwise hold cash. Both rules below are charged ${(V.cost_per_switch*100).toFixed(2)}% every time they move in or out, for trading costs. ${monthName(V.start)} to ${monthName(V.end)}.`;
+  const rows=[["Average growth per year, after costs",x=>pct(x.cagr),x=>x.cagr],["Worst fall from a peak",x=>pct0(x.maxdd),x=>x.maxdd],["Return per unit of risk",x=>x.sharpe.toFixed(2),x=>x.sharpe],["Time in stocks",x=>Math.round(x.time_in_stocks*100)+"%",null],["Trades per year",x=>x.switches_per_year.toFixed(1),null]];
+  document.querySelector("#vsTable tbody").innerHTML=rows.map(r=>{const best=r[2]?Math.max(...cols.map(r[2])):null;return `<tr><td>${r[0]}</td>${cols.map(x=>{const b=r[2]&&r[2](x)===best;return `<td class="num"${b?' style="font-weight:700"':''}>${r[1](x)}${b?' <span class="sr">(best)</span>':''}</td>`;}).join("")}</tr>`;}).join("")+`<tr><td class="muted small" colspan="6">Bold = best. The trend rule acts at the start of the month after the market closes above or below its average; the inflation rule acts in the month after the data are published.</td></tr>`;
+  const U=V.crash_by_trend.trend_up,pv=U.p,ip=R.inflation,tr=R.trend;
+  const better=ip.sharpe>tr.sharpe;
+  document.getElementById("vsVerdict").innerHTML=`After costs the inflation rule earned ${pct(ip.cagr)} a year against ${pct(tr.cagr)} for the trend rule and ${pct(R.buy_hold.cagr)} always in stocks, ${better?"with the best return per unit of risk of the three":"but with less return per unit of risk than the trend rule"}. The trend rule had the smaller worst fall (${pct0(tr.maxdd)} vs ${pct0(ip.maxdd)}). They mostly sit out different months: only ${Math.round(V.cash_overlap*100)}% of the inflation rule's cash months were also trend-rule cash months. <b>The key test:</b> even when the trend was up, the moment a trend follower is fully invested, months with inflation heating were followed by a 10%+ fall within a year ${Math.round(U.heating*100)}% of the time, against ${Math.round(U.not*100)}% otherwise. ${pv<0.05?`Random timings matched that gap only ${pv<0.01?(pv*100).toFixed(1):Math.round(pv*100)}% of the time, so the inflation hand carries warning the trend rule does not.`:`That gap could be luck (${Math.round(pv*100)}% of random timings matched it).`} Using both, cash whenever either warns, gave the smallest worst fall (${pct0(R.either.maxdd)}) at ${pct(R.either.cagr)} a year.`;
+  document.getElementById("cmpTrend").textContent=`After costs, ${pct(ip.cagr)} a year vs ${pct(tr.cagr)} for the trend rule, with a deeper worst fall (${pct0(ip.maxdd)} vs ${pct0(tr.maxdd)}). The two warn at different times, and the inflation signal still flags crash risk when the trend is up.`;
+}
+function drawData(){
+  if(!AUD||!AUD.data)return;
+  const rights={public:["Public data","y"],reserve_bank:["Free, terms apply","p"],copyrighted:["Copyrighted","n"]};
+  const labels={};[...D.inputs.growth,...D.inputs.inflation].forEach(r=>labels[r.id]=r.label);
+  Object.assign(labels,{CFNAI:"Chicago Fed activity index (check only)",GACDISA066MSFRBNY:"Empire State factory survey (check only)",GS10:"10-year Treasury yield",GS2:"2-year Treasury yield",FEDFUNDS:"Fed funds rate",USREC:"Recession dates",GDPC1:"Real GDP"});
+  const rows=AUD.data.series.filter(r=>labels[r.id]);
+  document.querySelector("#srcTable tbody").innerHTML=rows.map(r=>{const k=rights[r.kind]||["?","p"];return `<tr><td>${labels[r.id]}${r.filled.length?' <span class="muted small">*</span>':""}</td><td class="small">${r.agency}</td><td class="num mono small">${r.first.slice(0,4)}–${r.last}</td><td><span class="badge ${k[1]}">${k[0]}</span></td></tr>`;}).join("")
+    +`<tr><td>US stock and industry returns, T-bills</td><td class="small">CRSP, via the Ken French Data Library</td><td class="num mono small">1959–${AUD.data.returns.last}</td><td><span class="badge n">Licensed</span></td></tr>`;
+  const filled=rows.filter(r=>r.filled.length);
+  document.getElementById("srcNote").innerHTML=`Every series is checked weekly for duplicate dates, gaps and stale data. ${filled.length?`* ${filled.map(r=>labels[r.id]).join(", ")}: ${[...new Set(filled.flatMap(r=>r.filled))].map(monthName).join(", ")} was never collected (government shutdown), so it is filled by a straight line between the months either side, the standard fix. `:""}All data are fetched through FRED, the St. Louis Fed's database, whose terms allow personal and non-commercial use; a commercial version would draw the same numbers from each original agency.`;
+  const B=AUD.benchmarks||{},li=[];
+  if(B.cfnai)li.push(`<b>Growth hand vs the Chicago Fed national activity index</b> (85 indicators): correlation ${B.cfnai.corr.toFixed(2)} against the index's 12-month average and ${B.cfnai.corr_ma3.toFixed(2)} against its faster 3-month average. Same third ${Math.round(B.cfnai.same_third*100)}% of the time. So the growth hand measures the right thing but turns later than the faster gauge.`);
+  if(B.recessions)li.push(`<b>Recessions:</b> ${Math.round(B.recessions.rec_months_in_weak*100)}% of official recession months fall in the weak-growth third, and ${B.recessions.rec_months_in_strong?Math.round(B.recessions.rec_months_in_strong*100)+"%":"none"} in the strong third.`);
+  if(B.philly_vs_empire){const P=B.philly_vs_empire;li.push(`<b>Is one regional factory survey enough?</b> The Philadelphia Fed survey used here moves with the New York Fed's Empire State survey (correlation ${P.corr.toFixed(2)} since ${P.since.slice(0,4)}). Latest 3-month averages: Philadelphia ${P.latest_philly>=0?"+":"−"}${Math.abs(P.latest_philly).toFixed(1)}, New York ${P.latest_empire>=0?"+":"−"}${Math.abs(P.latest_empire).toFixed(1)}.`);}
+  const rt=AUD.vintage;li.push(rt?`<b>First-release data:</b> tested; see the report card.`:`<b>First-release data:</b> not yet tested. The history uses today's revised figures, which flatter any model a little; see point 1 below.`);
+  document.getElementById("xchecks").innerHTML=li.map(x=>`<li style="margin-bottom:6px">${x}</li>`).join("");
+  const needs=[
+    `<b>A test on the numbers as first published.</b> Jobs, income and output figures get revised, sometimes by a lot, and a fund will want proof the signal worked on what people actually saw at the time. The code is ready; it needs a free FRED API key added to the GitHub repository.`,
+    `<b>Commercial data rights.</b> Pull each series from its original agency instead of FRED, replace the copyrighted oil-price splice with the Energy Information Administration's public price (1986 on) plus licensed earlier history, and license stock returns (CRSP or S&P) instead of using the free academic files.`,
+    `<b>A broader factory-survey input.</b> Today's reading changes if the Philadelphia Fed survey is dropped (see "How firm is today's reading?"). Averaging several regional Fed surveys would make it less fragile.`,
+    `<b>A live track record.</b> Every weekly update is saved with a timestamp in the public GitHub history, starting October 2026. That record cannot be backfilled, which is exactly what makes it convincing; it needs a few years.`,
+    `<b>Clear positioning.</b> The report card shows it does not forecast returns better than the long-run average. Its proven use is as a risk gauge: heating inflation has meant much higher odds of a 10%+ fall. It should be sold as that, not as a return forecast.`];
+  document.getElementById("needs").innerHTML=needs.map(x=>`<li style="margin-bottom:6px">${x}</li>`).join("");
+}
+function full(){drawStamp();drawReport();drawNow();drawFacts();drawMetricSeg();drawHorSeg();drawEvidence();drawBacktest();drawVs();drawData();drawTables();render();}
 function stop(){if(timer){clearInterval(timer);timer=null;}document.getElementById("play").textContent="Replay 10 years";}
 function init(){
   const s=document.getElementById("month");s.max=N-1;s.value=idx;
